@@ -116,6 +116,8 @@ class DETECT():
         self.predict_image.argtypes = [c_void_p, IMAGE]
         self.predict_image.restype = POINTER(c_float)
 
+        self.detected_objects = None
+
     def classify(self, net, meta, im):
         out = self.predict_image(net, im)
         res = []
@@ -139,26 +141,30 @@ class DETECT():
                 if dets[j].prob[i] > 0:
                     b = dets[j].bbox
                     res.append((meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
-        res = sorted(res, key=lambda x: -x[1])
-        # free_image(im)
-        # free_detections(dets, num)
-        return res
+        self.detected_objects = sorted(res, key=lambda x: -x[1])
+        self.free_image(im)
+        self.free_detections(dets, num)
+
+    def output(self, objects, thresh):
+        counter = 0
+        for obj in self.detected_objects:
+            print(f"Object is a {obj[0].decode('ASCII')} with probability {(obj[1]*100):.2f}%")
+
+            if obj[0].decode('ASCII') in objects and obj[1] >= thresh:
+                counter += 1
+        
+        return counter
+
     
 if __name__ == "__main__":
     classifier = DETECT()
     net = classifier.load_net(b"cfg/yolov3.cfg", b"yolov3.weights", 0)
     meta = classifier.load_meta(b"cfg/coco.data")
-    r = classifier.detect(net, meta, b"data/cars.jpg")
-    #print r[:10]x
-    # meta = load_meta(b"cfg/coco.data")
-    counter = 0
-    for i in r:
-        print(f"Object is a {i[0].decode('ASCII')} with probability {(i[1]*100):.2f}%")
+    
+    classifier.detect(net, meta, b"data/cars.jpg")
+    num_cars = classifier.output(["car", "truck"], 0.8)
 
-        if (i[0].decode('ASCII').lower() == "car" or i[0].decode('ASCII').lower() == "truck") and i[1] >= 0.8:
-            counter += 1
-
-    print(f'\n\nDetected {counter} cars in the image')
+    print(f'\n\nDetected {num_cars} cars in the image')
 
     
 
