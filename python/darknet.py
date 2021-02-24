@@ -182,6 +182,8 @@ class DETECT():
 
     
 if __name__ == "__main__":
+    
+    # arg parser 
     parser = argparse.ArgumentParser()
     parser.add_argument("-f","--file-path",action="store",
                         help="point to the dll file location for the darknet executable file - default value: ./libdarknet.so",
@@ -191,10 +193,12 @@ if __name__ == "__main__":
 
     path = osp.abspath(args.filepath)
 
+    # initialize the classifier
     classifier = DETECT(path, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
     classifier.setup()
     objects = ["car", "truck"]
 
+    # detect the objects in the specified images
     classifier.detect(b"data/cars.jpg")
     num_cars = classifier.output(objects, 0.8)
 
