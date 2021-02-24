@@ -1,6 +1,10 @@
 from ctypes import *
 import math
 import random
+import argparse
+
+import os
+import os.path as osp
 
 def sample(probs):
     s = sum(probs)
@@ -46,8 +50,17 @@ class METADATA(Structure):
 
 #lib = CDLL("/home/pjreddie/documents/darknet/libdarknet.so", RTLD_GLOBAL)
 class DETECT():
-    def __init__(self):
-        self.lib = CDLL("libdarknet.so", RTLD_GLOBAL)
+    def __init__(self, path, cfg, weights, data):
+        self.dllpath = path
+        self.cfg = cfg
+        self.weights = weights
+        self.data = data
+
+        # change working directory to ensure nothing breaks
+        self.setroot(self.dllpath) 
+
+        # load functions from dll
+        self.lib = CDLL(self.dllpath, RTLD_GLOBAL)
         self.lib.network_width.argtypes = [c_void_p]
         self.lib.network_width.restype = c_int
         self.lib.network_height.argtypes = [c_void_p]
@@ -117,6 +130,18 @@ class DETECT():
         self.predict_image.restype = POINTER(c_float)
 
         self.detected_objects = None
+        
+
+    
+    def setroot(self, path):
+        paths = osp.split(path)
+        os.chdir(paths[0])
+
+    def setup(self):
+        # make sure cfg, weights, and data are file paths that are byte strings
+        self.net = classifier.load_net(self.cfg, self.weights, 0)
+        self.meta = classifier.load_meta(self.data)
+
 
     def classify(self, net, meta, im):
         out = self.predict_image(net, im)
@@ -126,21 +151,21 @@ class DETECT():
         res = sorted(res, key=lambda x: -x[1])
         return res
 
-    def detect(self, net, meta, image, thresh=.5, hier_thresh=.5, nms=.45):
+    def detect(self, image, thresh=.5, hier_thresh=.5, nms=.45):
         im = self.load_image(image, 0, 0)
         num = c_int(0)
         pnum = pointer(num)
-        self.predict_image(net, im)
-        dets = self.get_network_boxes(net, im.w, im.h, thresh, hier_thresh, None, 0, pnum)
+        self.predict_image(self.net, im)
+        dets = self.get_network_boxes(self.net, im.w, im.h, thresh, hier_thresh, None, 0, pnum)
         num = pnum[0]
-        if (nms): self.do_nms_obj(dets, num, meta.classes, nms);
+        if (nms): self.do_nms_obj(dets, num, self.meta.classes, nms);
 
         res = []
         for j in range(num):
-            for i in range(meta.classes):
+            for i in range(self.meta.classes):
                 if dets[j].prob[i] > 0:
                     b = dets[j].bbox
-                    res.append((meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
+                    res.append((self.meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
         self.detected_objects = sorted(res, key=lambda x: -x[1])
         self.free_image(im)
         self.free_detections(dets, num)
@@ -157,14 +182,25 @@ class DETECT():
 
     
 if __name__ == "__main__":
-    classifier = DETECT()
-    net = classifier.load_net(b"cfg/yolov3.cfg", b"yolov3.weights", 0)
-    meta = classifier.load_meta(b"cfg/coco.data")
-    
-    classifier.detect(net, meta, b"data/cars.jpg")
-    num_cars = classifier.output(["car", "truck"], 0.8)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f","--file-path",action="store",
+                        help="point to the dll file location for the darknet executable file - default value: ./libdarknet.so",
+                        dest="filepath",type=str, default="libdarknet.so")
 
-    print(f'\n\nDetected {num_cars} cars in the image')
+    args = parser.parse_args()
+
+    path = osp.abspath(args.filepath)
+
+    classifier = DETECT(path, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
+    classifier.setup()
+    objects = ["car", "truck"]
+
+    classifier.detect(b"data/cars.jpg")
+    num_cars = classifier.output(objects, 0.8)
+
+    print(f'\n\nDetected {num_cars} cars in the image\n\n')
+    print('----------------------------------------------------------------------------\n\n')
+
 
     
 
