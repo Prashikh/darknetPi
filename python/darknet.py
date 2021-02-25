@@ -132,6 +132,8 @@ class DETECT():
         self.predict_image.restype = POINTER(c_float)
 
         self.detected_objects = None
+
+        self.setup()
     
     def setroot(self, path):
         paths = osp.split(path)
@@ -140,8 +142,8 @@ class DETECT():
 
     def setup(self):
         # make sure cfg, weights, and data are file paths that are byte strings
-        self.net = classifier.load_net(self.cfg, self.weights, 0)
-        self.meta = classifier.load_meta(self.data)
+        self.net = self.load_net(self.cfg, self.weights, 0)
+        self.meta = self.load_meta(self.data)
 
 
     def classify(self, im):
@@ -196,11 +198,15 @@ class DETECT():
 
 
 def parse_args():
-    # arg parser 
+    # arg parser
+    # TODO: maybe add args to specify weights, data, and cfg files
     parser = argparse.ArgumentParser()
     parser.add_argument("-f","--file-path",action="store",
                         help="point to the dll file location for the darknet executable file - default value: ./libdarknet.so",
                         dest="filepath",type=str, default="libdarknet.so")
+    parser.add_argument("-d","--debug",action="store_true",
+                        help="indicate if debug prints should be printed in the terminal",
+                        dest="debug")
 
     args = parser.parse_args()
 
@@ -210,11 +216,10 @@ def parse_args():
 if __name__ == "__main__":
     
     # initialize the classifier
-    args = parse()
+    args = parse_args()
     classifier = DETECT(args.filepath, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
-    classifier.setup()
     objects = ["car", "truck", "person"]
-    classifier.parse_image(b"data/cars.jpg", objects)
+    classifier.parse_image(b"data/cars.jpg", objects, args.debug)
 
     # detect the objects in the specified images
 
