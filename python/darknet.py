@@ -51,6 +51,8 @@ class METADATA(Structure):
 #lib = CDLL("/home/pjreddie/documents/darknet/libdarknet.so", RTLD_GLOBAL)
 class DETECT():
     def __init__(self, path, cfg, weights, data):
+
+        # set defaults
         self.dllpath = path
         self.cfg = cfg
         self.weights = weights
@@ -130,12 +132,11 @@ class DETECT():
         self.predict_image.restype = POINTER(c_float)
 
         self.detected_objects = None
-        
-
     
     def setroot(self, path):
         paths = osp.split(path)
-        os.chdir(paths[0])
+        if paths[0]:
+            os.chdir(paths[0])
 
     def setup(self):
         # make sure cfg, weights, and data are file paths that are byte strings
@@ -143,11 +144,11 @@ class DETECT():
         self.meta = classifier.load_meta(self.data)
 
 
-    def classify(self, net, meta, im):
-        out = self.predict_image(net, im)
+    def classify(self, im):
+        out = self.predict_image(self.net, im)
         res = []
-        for i in range(meta.classes):
-            res.append((meta.names[i], out[i]))
+        for i in range(self.meta.classes):
+            res.append((self.meta.names[i], out[i]))
         res = sorted(res, key=lambda x: -x[1])
         return res
 
@@ -170,19 +171,31 @@ class DETECT():
         self.free_image(im)
         self.free_detections(dets, num)
 
-    def output(self, objects, thresh):
-        counter = 0
+    def output(self, objects, thresh, print_dections):
+        
+        amounts = dict.fromkeys(objects,0)
         for obj in self.detected_objects:
-            print(f"Object is a {obj[0].decode('ASCII')} with probability {(obj[1]*100):.2f}%")
+            if print_dections:
+                print(f"Object is a {obj[0].decode('ASCII')} with probability {(obj[1]*100):.2f}%")
 
             if obj[0].decode('ASCII') in objects and obj[1] >= thresh:
-                counter += 1
+                amounts[obj[0].decode('ASCII')] += 1
         
-        return counter
+        return amounts
 
-    
-if __name__ == "__main__":
-    
+    def parse_image(self, image, objects=None, print_detections=False):
+        self.detect(image)
+        objects = self.output(objects, 0.8, print_detections)
+ 
+        if print_detections:       
+            for obj in objects:
+                print(f'Detected {objects[obj]} {obj}(s) in the image')
+            print('----------------------------------------------------------------------------\n\n')
+
+        return objects
+
+
+def parse_args():
     # arg parser 
     parser = argparse.ArgumentParser()
     parser.add_argument("-f","--file-path",action="store",
@@ -191,19 +204,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    path = osp.abspath(args.filepath)
+    return args
 
+    
+if __name__ == "__main__":
+    
     # initialize the classifier
-    classifier = DETECT(path, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
+    args = parse()
+    classifier = DETECT(args.filepath, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
     classifier.setup()
-    objects = ["car", "truck"]
+    objects = ["car", "truck", "person"]
+    classifier.parse_image(b"data/cars.jpg", objects)
 
     # detect the objects in the specified images
-    classifier.detect(b"data/cars.jpg")
-    num_cars = classifier.output(objects, 0.8)
 
-    print(f'\n\nDetected {num_cars} cars in the image\n\n')
-    print('----------------------------------------------------------------------------\n\n')
 
 
     
