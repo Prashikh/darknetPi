@@ -49,6 +49,7 @@ class METADATA(Structure):
     
 
 #lib = CDLL("/home/pjreddie/documents/darknet/libdarknet.so", RTLD_GLOBAL)
+#TODO: define a root level folder
 class DETECT():
     def __init__(self, path, cfg, weights, data):
 
@@ -200,10 +201,14 @@ class DETECT():
 def parse_args():
     # arg parser
     # TODO: maybe add args to specify weights, data, and cfg files
+    # TODO: for files maybe only specify the name and use os.walk to see if they exist in the repo somewhere
     parser = argparse.ArgumentParser()
     parser.add_argument("-f","--file-path",action="store",
                         help="point to the dll file location for the darknet executable file - default value: ./libdarknet.so",
-                        dest="filepath",type=str, default="libdarknet.so")
+                        dest="filepath",type=str, default="./libdarknet.so")
+    parser.add_argument("-w","--weights",action="store",
+                        help="point to the weights file location for the classifier - default value: ./yolov3.weights",
+                        dest="weights",type=str,default="./yolov3.weights")
     parser.add_argument("-d","--debug",action="store_true",
                         help="indicate if debug prints should be printed in the terminal",
                         dest="debug")
@@ -217,7 +222,7 @@ if __name__ == "__main__":
     
     # initialize the classifier
     args = parse_args()
-    classifier = DETECT(args.filepath, b"cfg/yolov3.cfg", b"yolov3.weights", b"cfg/coco.data")
+    classifier = DETECT(args.filepath, b"cfg/yolov3.cfg", args.weights, b"cfg/coco.data")
     objects = ["car", "truck", "person"]
     classifier.parse_image(b"data/cars.jpg", objects, args.debug)
 
